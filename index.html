@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>防災向け完全ローカルSTTシステム 設計書 v2.0 | Document</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-primary: #f0f4f8;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f8fafc;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      --primary: #2563eb;
+      --primary-light: #dbeafe;
+      --success-bg: #ecfdf5; --success-border: #6ee7b7; --success-text: #065f46;
+      --warn-bg: #fffbeb; --warn-border: #fcd34d; --warn-text: #92400e;
+      --danger-bg: #fef2f2; --danger-border: #fca5a5; --danger-text: #991b1b;
+      --info-bg: #eff6ff; --info-border: #93c5fd; --info-text: #1e40af;
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-main);
+      line-height: 1.75;
+      padding: 40px 20px 80px;
+    }
+    .container { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 5px; }
+
+    /* ── Header ── */
+    .doc-header {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 40px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .doc-header::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 5px;
+      background: linear-gradient(90deg, #0ea5e9, #2563eb, #7c3aed);
+    }
+    .header-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .version-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #dbeafe; color: #1d4ed8;
+      border: 1px solid #93c5fd;
+      padding: 5px 14px; border-radius: 9999px;
+      font-weight: 700; font-size: 0.84rem;
+    }
+    .meta-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .meta-chip {
+      background: var(--bg-subtle); color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 4px 12px; font-size: 0.82rem; font-weight: 500;
+    }
+    .doc-title { font-size: 1.9rem; font-weight: 800; line-height: 1.3; }
+    .doc-sub { color: var(--text-muted); margin-top: 10px; font-size: 0.95rem; }
+
+    /* ── Section Card ── */
+    .section-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px 36px;
+      box-shadow: var(--shadow);
+    }
+    .section-title {
+      font-size: 1.3rem; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--bg-primary);
+      margin-bottom: 24px;
+    }
+
+    /* ── Details / Fold ── */
+    details > summary {
+      list-style: none; cursor: pointer;
+      font-size: 1.02rem; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      transition: background 0.15s;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary::before { content: "▶"; font-size: 0.8rem; color: var(--primary); transition: transform 0.2s; }
+    details[open] > summary::before { transform: rotate(90deg); }
+    details[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: var(--primary-light); }
+    .fold-body {
+      border: 1px solid var(--border); border-top: none;
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      padding: 20px 22px;
+    }
+
+    /* ── Tables ── */
+    .table-scroll { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--bg-subtle); font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: none; }
+    td:first-child { font-weight: 600; background: #fafbfc; border-right: 1px solid var(--border); white-space: nowrap; }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm);
+      font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+    }
+    .badge.ok { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+    .badge.warn { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+    .badge.danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .badge.info { background: var(--info-bg); color: var(--info-text); border: 1px solid var(--info-border); }
+
+    /* ── Tech Cards ── */
+    .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .tech-card {
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      overflow: hidden; transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .tech-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .tech-card-header {
+      padding: 14px 18px;
+      font-weight: 800; font-size: 0.95rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tech-card-header.flutter { background: #eff6ff; border-bottom: 3px solid #2563eb; color: #1e40af; }
+    .tech-card-header.ffi { background: #f0fdf4; border-bottom: 3px solid #16a34a; color: #15803d; }
+    .tech-card-header.quant { background: #fef3c7; border-bottom: 3px solid #d97706; color: #92400e; }
+    .tech-card-header.pcm { background: #fce7f3; border-bottom: 3px solid #db2777; color: #9d174d; }
+    .tech-card-header.ram { background: #ede9fe; border-bottom: 3px solid #7c3aed; color: #5b21b6; }
+    .tech-card-body { padding: 14px 18px; font-size: 0.88rem; color: var(--text-muted); }
+
+    /* ── Flow ── */
+    .flow-steps { display: flex; flex-direction: column; gap: 0; }
+    .flow-step {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 20px 0;
+    }
+    .flow-step:not(:last-child) { border-bottom: 1px dashed var(--border); }
+    .step-num {
+      width: 40px; height: 40px; min-width: 40px;
+      background: var(--primary); color: #fff;
+      border-radius: 50%; font-size: 0.9rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-content { flex: 1; }
+    .step-title { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+    .step-desc { font-size: 0.9rem; color: var(--text-muted); }
+    .step-items { margin-top: 8px; font-size: 0.86rem; }
+
+    /* ── Result display ── */
+    .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .result-item {
+      background: var(--bg-subtle); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      text-align: center;
+    }
+    .result-item .label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .result-item .value { font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-top: 4px; }
+
+    /* ── Log JSON block ── */
+    .json-block {
+      background: #1e293b; color: #e2e8f0;
+      border-radius: var(--radius-md); padding: 20px 22px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; line-height: 1.6;
+      overflow-x: auto; white-space: pre;
+    }
+    .json-key { color: #7dd3fc; }
+    .json-str { color: #86efac; }
+    .json-num { color: #fbbf24; }
+    .json-null { color: #94a3b8; font-style: italic; }
+
+    /* ── Patent cards ── */
+    .patent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    .patent-card {
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .patent-card-header {
+      padding: 12px 16px; font-weight: 700; font-size: 0.9rem;
+      background: #1e293b; color: #f8fafc;
+    }
+    .patent-card-body { padding: 14px 16px; font-size: 0.86rem; }
+    .patent-card-body ul { padding-left: 18px; }
+
+    /* ── Strategy cards ── */
+    .strategy-list { display: flex; flex-direction: column; gap: 12px; }
+    .strategy-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 16px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .strategy-num {
+      width: 32px; height: 32px; min-width: 32px;
+      background: #16a34a; color: #fff;
+      border-radius: 50%; font-size: 0.82rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .strategy-title { font-weight: 700; font-size: 0.92rem; }
+    .strategy-desc { font-size: 0.86rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Screenshot ── */
+    .screenshot-container {
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      overflow: hidden; background: #f9fafb;
+    }
+    .screenshot-container img {
+      width: 100%; display: block;
+    }
+    .screenshot-caption {
+      padding: 10px 16px; font-size: 0.82rem; color: var(--text-muted);
+      text-align: center; background: var(--bg-subtle); border-top: 1px solid var(--border);
+    }
+
+    /* ── History ── */
+    .history-card {
+      background: var(--bg-subtle); border: 1px dashed #cbd5e1;
+      border-radius: var(--radius-lg); padding: 24px 32px;
+    }
+    .history-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; }
+    .history-row { display: flex; gap: 16px; font-size: 0.87rem; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .history-row:last-child { border-bottom: none; }
+    .h-ver { font-weight: 700; color: var(--primary); width: 72px; flex-shrink: 0; }
+    .h-date { color: var(--text-light); width: 90px; flex-shrink: 0; }
+    .h-desc { line-height: 1.7; }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .tech-grid, .patent-grid { grid-template-columns: 1fr; }
+      .doc-header { padding: 24px 20px; }
+      .section-card { padding: 20px 18px; }
+      .result-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ── Details stack spacing ── */
+    .details-stack { display: flex; flex-direction: column; gap: 10px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ══════════════════════════════════════════ HEADER ══════════════════════════════════════════ -->
+  <header class="doc-header">
+    <div class="header-meta">
+      <div class="version-badge">📄 v2.0</div>
+      <div class="meta-row">
+        <span class="meta-chip">開発手法: アジャイル開発</span>
+        <span class="meta-chip">更新: 2026-08-25</span>
+        <span class="meta-chip">カテゴリ: 設計書</span>
+      </div>
+    </div>
+    <h1 class="doc-title">防災向け完全ローカルSTTシステム<br>スパイラル１設計書</h1>
+    <p class="doc-sub" style="margin-bottom: 20px;">
+      完全オフラインの音声認識（Speech-to-Text）プロトタイプ検証アプリの設計仕様。<br>
+      Flutter + Dart FFI + C++推論エンジンによるクロスプラットフォーム（Android / iOS）実装と、テスト・評価計画を網羅する。
+    </p>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="background: var(--info-bg); border: 1px solid var(--info-border); border-radius: var(--radius-sm); padding: 14px 18px;">
+        <div style="font-weight:700; color:var(--info-text); margin-bottom:6px;">🎯 検証範囲・対象OS</div>
+        <div style="font-size:0.9rem;">防災向け完全オフラインSTTの技術検証（Android / iOSでのOS間フェア比較）。なお、今回は日本語と英語のみを対象とし、タイ語は対象外とする。</div>
+      </div>
+      <div style="background: var(--info-bg); border: 1px solid var(--info-border); border-radius: var(--radius-sm); padding: 14px 18px;">
+        <div style="font-weight:700; color:var(--info-text); margin-bottom:6px;">🤖 検証モデル</div>
+        <div style="font-size:0.9rem;">gemma / whisper.cpp / sherpa-onnx / qwen</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════ TABLE OF CONTENTS ══════════════════════════════════════════ -->
+  <section class="section-card" style="padding: 24px 36px; margin-bottom: 24px;">
+    <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 12px;">📑 目次（スコープと検証範囲）</h2>
+    <ul style="list-style: none; padding-left: 0; line-height: 1.8;">
+      <li><a href="#ui-mockup">1. UI画面構成</a> — 状態確認やログ取得に特化したミニマル設計</li>
+      <li><a href="#system-flow">2. システムフロー</a> — アプリ起動時のモデルロード、リアルタイム処理を見据えた推論時間計測</li>
+      <li><a href="#tech-stack">3. 技術スタック</a> — Flutter, Dart FFI, C++推論エンジン</li>
+      <li><a href="#log-schema">4. ログスキーマ</a> — 一括ダウンロード可能なJSONL形式データ</li>
+      <li><a href="#test-plan">5. テスト計画</a> — スパイラル1必須項目に絞り込んだテスト（1週間想定）</li>
+    </ul>
+  </section>
+
+  <!-- ══════════════════════════════════════════ 3. UI MOCKUP ══════════════════════════════════════════ -->
+  <section class="section-card" id="ui-mockup">
+    <h2 class="section-title">📱 1. UI画面構成</h2>
+
+    <div class="screenshot-container">
+      <img src="73c81335-cb39-44c7-b43a-73349ba5f16f.png" alt="local stt アプリUI画面">
+      <div class="screenshot-caption">図1: local sttアプリ UIモックアップ — ホーム画面 / ログ一覧・詳細 / 設定画面 / 画面遷移</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ 2. SYSTEM FLOW ══════════════════════════════════════════ -->
+  <section class="section-card" id="system-flow">
+    <h2 class="section-title">🔄 2. システムフロー（処理の流れ）</h2>
+
+    <div class="screenshot-container" style="margin-bottom: 24px;">
+      <img src="ChatGPT Image Aug 25, 2026, 07_07_50 PM.png" alt="システムフロー全体図">
+      <div class="screenshot-caption">図2: システム全体の処理フロー — 基本情報・システム構成・テスト評価の3層構造</div>
+    </div>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">アプリ起動と初期設定（Settings）</div>
+          <div class="step-desc">アプリ初回起動時、または設定画面にてSTTモデルと言語を選択し、モデルをロードする。都度の切り替えミスを防ぐため、**ロード完了後に不要なキャッシュを削除し、テスト中は状態を固定する**。</div>
+          <div class="step-items">
+            <ul>
+              <li><strong>STTモデル選択:</strong> gemma / whisper.cpp（Tiny系）/ sherpa-onnx（日本語/英語）/ qwen</li>
+              <li><strong>Language選択:</strong> 音声認識エンジンに渡す言語（Japanese / English）</li>
+              <li><strong>動作設定:</strong> 最大録音時間（自動停止）の指定（例：20秒）</li>
+              <li>※ 設定変更時は必ず再ロードを行い、常に同じモデル品質で出力できるようにする。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">ホーム画面（Home）での準備と音声入力</div>
+          <div class="step-desc">シナリオ等の必要な情報が揃っているか確認し、過不足がなければ録音可能になる。</div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+            <div style="background: var(--info-bg); border: 1px solid var(--info-border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 0.86rem;">
+              <div style="font-weight:700; color:var(--info-text); margin-bottom:4px;">✅ 事前準備</div>
+              <ul style="margin:0; padding-left:16px;">
+                <li>Scenario等の情報を入力</li>
+                <li>情報不足時は <span class="badge warn">UNREADY</span></li>
+                <li>準備完了で <span class="badge ok">READY</span> になり録音可能に</li>
+              </ul>
+            </div>
+            <div style="background: var(--info-bg); border: 1px solid var(--info-border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 0.86rem;">
+              <div style="font-weight:700; color:var(--info-text); margin-bottom:4px;">🎤 音声入力</div>
+              <ul style="margin:0; padding-left:16px;">
+                <li><strong>Record:</strong> 最大20秒（設定値）で自動停止、または手動停止で完了</li>
+                <li><strong>Import:</strong> 外部ファイル読み込み（png等の非音声ファイルはエラーとして弾く）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">STT推論と結果表示</div>
+          <div class="step-desc">
+            選択されたSTTエンジンで推論を実行し、テキストを画面に出力する。
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">ログの管理と出力（Log）</div>
+          <div class="step-desc">
+            実行結果は自動保存され、ログ画面から一覧（履歴）および詳細を確認できる。SuccessかErrorのみを扱う。
+          </div>
+          <div class="step-items" style="margin-top: 8px;">
+            <ul>
+              <li><strong>一覧画面:</strong> 各Runのステータスを表示。</li>
+              <li><strong>詳細画面:</strong> 特定のログをタップし、該当データや音声/テキストファイルを個別に出力できる。</li>
+              <li><strong>一括エクスポート:</strong> PCでの分析用に、全ログデータをJSONL形式で一括出力できる。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ 1. TECH STACK ══════════════════════════════════════════ -->
+  <section class="section-card" id="tech-stack">
+    <h2 class="section-title">🔧 3. 技術スタック（アーキテクチャ詳細）</h2>
+    <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:20px;">
+      本システムを構成する5つのコア技術要素。それぞれが果たす役割を整理する。
+    </p>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <div class="tech-card-header flutter">🦋 Flutter — UI &amp; アプリケーション基盤</div>
+        <div class="tech-card-body">
+          AndroidとiOSの両方で全く同じ画面（マイク入力、音声ファイル選択、結果表示、ログ保存）を構築するクロスプラットフォームフレームワーク。
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header ffi">🔗 Dart FFI — 連携ブリッジ</div>
+        <div class="tech-card-body">
+          Flutterで作った画面（Dart）とC++で書かれたAIエンジンは言語が違い、そのままでは会話できない。この「通訳」として間に立ち、お互いのデータを直接やり取りするパイプ役。
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header quant">⚡ 一律 INT4 / INT8 量子化</div>
+        <div class="tech-card-body">
+          AIモデルのファイルサイズとRAM使用量を劇的に削減し、ミドルレンジスマホやメモリの厳しいiPhoneでもOOMせず安定稼働させる。あわせて特許回避もクリア。
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header pcm">🎵 PCM 解凍 — 音声前処理</div>
+        <div class="tech-card-body">
+          マイクから入った音声や受け取ったオーディオデータを、一度余計な圧縮のない素の音声データ（PCM）にデコード。STTエンジンの入力仕様に合わせてサンプリングレートやチャンネルを調整する。
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-header ram">📊 RAM計測（優先度低）</div>
+        <div class="tech-card-body">
+          <strong>※ 本フェーズでは文字起こしと推論速度を優先し、RAM計測は取得可能な範囲で構わない（最悪なくても可）。</strong><br>
+          可能であれば、C++側の別スレッドでピークRAM使用量をログに記録する。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ 4. LOG SCHEMA ══════════════════════════════════════════ -->
+  <section class="section-card" id="log-schema">
+    <h2 class="section-title">💾 4. ログスキーマ（JSONL形式）</h2>
+    <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:20px;">
+      各Runの実行結果をJSONL形式で1行1レコードとして保存する。以下は実際の保存例。
+    </p>
+
+    <div class="details-stack">
+      <details>
+        <summary>Run Log（1 Run = 1レコード）</summary>
+        <div class="fold-body">
+<div class="json-block">{
+  <span class="json-key">"run_id"</span>: <span class="json-num">15</span>,
+  <span class="json-key">"test_id"</span>: <span class="json-str">"V-014"</span>,
+  <span class="json-key">"timestamp_start"</span>: <span class="json-str">"2026-08-24T12:30:02+09:00"</span>,
+  <span class="json-key">"timestamp_end"</span>: <span class="json-str">"2026-08-24T12:30:14+09:00"</span>,
+
+  <span class="json-key">"scenario"</span>: <span class="json-str">"屋外・道路沿い"</span>,
+  <span class="json-key">"language"</span>: <span class="json-str">"ja"</span>,
+  <span class="json-key">"notes"</span>: <span class="json-str">"車の走行音あり"</span>,
+
+  <span class="json-key">"device_name"</span>: <span class="json-str">"iPhone"</span>,
+  <span class="json-key">"device_model"</span>: <span class="json-str">"iPhone 15 Pro"</span>,
+  <span class="json-key">"os"</span>: <span class="json-str">"iOS"</span>,
+  <span class="json-key">"os_version"</span>: <span class="json-str">"18.x"</span>,
+  <span class="json-key">"app_version"</span>: <span class="json-str">"0.1.0"</span>,
+
+  <span class="json-key">"candidate"</span>: <span class="json-str">"whisper.cpp"</span>,
+  <span class="json-key">"model_name"</span>: <span class="json-str">"whisper-tiny"</span>,
+  <span class="json-key">"runtime"</span>: <span class="json-str">"whisper.cpp"</span>,
+  <span class="json-key">"quantization"</span>: <span class="json-str">"INT8"</span>,
+  <span class="json-key">"model_size_mb"</span>: <span class="json-num">75.0</span>,
+  <span class="json-key">"model_load_time_ms"</span>: <span class="json-num">310</span>,
+  <span class="json-key">"is_cached"</span>: <span class="json-str">true</span>,
+
+  <span class="json-key">"input_source"</span>: <span class="json-str">"record"</span>,
+  <span class="json-key">"audio_file"</span>: <span class="json-str">"run_0015.wav"</span>,
+  <span class="json-key">"audio_duration_sec"</span>: <span class="json-num">8.42</span>,
+  <span class="json-key">"audio_file_size_kb"</span>: <span class="json-num">265.4</span>,
+  <span class="json-key">"channels"</span>: <span class="json-num">1</span>,
+
+  <span class="json-key">"transcript"</span>: <span class="json-str">"負傷者二名を確認しました"</span>,
+  <span class="json-key">"transcript_size_bytes"</span>: <span class="json-num">42</span>,
+
+  <span class="json-key">"inference_time_ms"</span>: <span class="json-num">1030</span>,
+
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"error_code"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"error_message"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"log_save_status"</span>: <span class="json-str">"success"</span>
+}</div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Event Log（UIステート遷移の記録）</summary>
+        <div class="fold-body">
+<div class="json-block"><span class="json-key">{"event_id"</span>:<span class="json-num">101</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"recording_started"</span>,    <span class="json-key">"ui_state"</span>:<span class="json-str">"RECORDING"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">102</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"recording_manual_stop"</span>, <span class="json-key">"ui_state"</span>:<span class="json-str">"SAVING_AUDIO"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">103</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"audio_save_success"</span>,    <span class="json-key">"ui_state"</span>:<span class="json-str">"TRANSCRIBING"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">104</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"transcription_started"</span>,  <span class="json-key">"ui_state"</span>:<span class="json-str">"TRANSCRIBING"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">105</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"transcription_finished"</span>, <span class="json-key">"ui_state"</span>:<span class="json-str">"DISPLAYING_RESULT"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">106</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"transcript_displayed"</span>,   <span class="json-key">"ui_state"</span>:<span class="json-str">"DONE"</span>}
+<span class="json-key">{"event_id"</span>:<span class="json-num">107</span>, <span class="json-key">"event_type"</span>:<span class="json-str">"log_save_success"</span>,       <span class="json-key">"ui_state"</span>:<span class="json-str">"DONE"</span>}</div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════ 5. TEST PLAN ══════════════════════════════════════════ -->
+  <section class="section-card" id="test-plan">
+    <h2 class="section-title">🧪 5. テスト計画（Spiral 1 Test Items）</h2>
+    <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:20px;">
+      1週間での実装完了を目指し、必須機能に絞り込んだテスト計画。Functional / Log / Error / Evaluation を中心に検証する。
+    </p>
+
+    <div class="details-stack">
+
+      <!-- App Startup & Transition -->
+      <details>
+        <summary>App Startup &amp; Transition — アプリ起動と状態遷移</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>AT-001</td><td>アプリが開けるか</td><td>正常に起動できること</td></tr>
+                <tr><td>AT-002</td><td>アプリが想定している遷移通りに動けるか</td><td>画面間の遷移が仕様通りに行われること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Initial Load & Setup -->
+      <details>
+        <summary>Initial Load &amp; Setup — 初期ロードと設定</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>IL-001</td><td>モデルを正確に読み込めるか・選択できるか</td><td>他のモデルと間違えず正確に選択・ロードできること</td></tr>
+                <tr><td>IL-002</td><td>STT用のLanguageを設定できるか</td><td>UI言語ではなくSTT用の言語として正しく設定されること</td></tr>
+                <tr><td>IL-003</td><td>モデル・言語を読み込んでからホームに行けるか</td><td>前回のモデルが残らないよう、ロード完了後にホームへ遷移すること</td></tr>
+                <tr><td>IL-004</td><td>すべてロードが終わってから開始を押せるか</td><td>準備完了(READY)状態になってから操作可能になること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Home Screen -->
+      <details>
+        <summary>Home Screen — ホーム画面の機能</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>HS-001</td><td>詳細情報や事前設定ページに遷移できるか</td><td>ボタンタップで各画面へ遷移できること</td></tr>
+                <tr><td>HS-002</td><td>録音ボタンと自動停止機能</td><td>マイク録音が開始でき、設定時間（20秒等）に達した場合は自動で停止すること</td></tr>
+                <tr><td>HS-003</td><td>音声ファイルの読み込みができるか</td><td>音声ファイルが正常にインポートできること</td></tr>
+                <tr><td>HS-004</td><td>壊れているファイル（png等）のエラーハンドリング</td><td>読み込めない旨を表示し、ログにも記録すること</td></tr>
+                <tr><td>HS-005</td><td>Ready状態の制御</td><td>情報が揃った状態でのみrecordが押せ、不足時はunreadyと分かること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- STT Result -->
+      <details>
+        <summary>STT Result — STT実行結果</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>SR-001</td><td>STT結果が文字として出力されているか</td><td>推論結果が画面上に正しくテキスト表示されること</td></tr>
+                <tr><td>SR-002</td><td>Inference Time（推論時間）の取得・表示</td><td>推論にかかった純粋な時間（Inference Time）が、結果画面およびログに確実に出力されること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Log Functions -->
+      <details>
+        <summary>Log Functions — ログ機能（一覧・詳細）</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>LG-001</td><td>ログ一覧のステータス表示</td><td>interruptedは不要とし、successとerrorのみ表示されること</td></tr>
+                <tr><td>LG-002</td><td>ログ詳細ページへの遷移</td><td>一覧からボタンタップで詳細画面へ遷移できること</td></tr>
+                <tr><td>LG-003</td><td>JSONLの一括出力</td><td>PCでの解析用に全ログをJSONLで一括出力できること</td></tr>
+                <tr><td>LG-004</td><td>ログ詳細の項目確認</td><td>必要なログ情報がすべて詳細画面に含まれていること</td></tr>
+                <tr><td>LG-005</td><td>単一ログの個別出力</td><td>ログ詳細画面からそのログのみを出力できること</td></tr>
+                <tr><td>LG-006</td><td>音声・テキストファイルの出力</td><td>詳細画面から関連する音声ファイルとテキストファイルが出力できること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Settings -->
+      <details>
+        <summary>Settings — 設定機能</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>ST-001</td><td>モデル・言語・動作設定の変更</td><td>設定画面から正確に変更でき、録音時間制限等が反映されること</td></tr>
+                <tr><td>ST-002</td><td>キャッシュ削除</td><td>キャッシュ削除ボタンで確実にキャッシュが削除できること</td></tr>
+                <tr><td>ST-003</td><td>変更後のモデル品質の安定性</td><td>変更後に前のキャッシュが残らず、最初でも最後でも同じモデル品質が保たれること</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <!-- Critical Project Requirements -->
+      <details>
+        <summary>Critical Requirements — プロジェクト必須要件（クリティカル）</summary>
+        <div class="fold-body">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>ID</th><th>テスト項目</th><th>期待結果</th></tr></thead>
+              <tbody>
+                <tr><td>CR-001</td><td>完全オフライン動作検証（機内モード）</td><td>ネットワークを完全に遮断した状態でも、STT推論が正常に完了すること（防災向けローカルSTTの絶対要件）</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+    </div><!-- /details-stack -->
+  </section>
+
+  <!-- ══════════════════════════════════════════ VERSION HISTORY ══════════════════════════════════════════ -->
+  <div class="history-card">
+    <div class="history-title">📋 バージョン履歴</div>
+    <div class="history-row">
+      <span class="h-ver">v2.0.0</span>
+      <span class="h-date">2026-08-25</span>
+      <div class="h-desc">
+        <strong>【仕様変更 (v2.0.0 全面改訂)】</strong><br>
+        <ul style="margin: 4px 0 0 16px; padding: 0;">
+          <li><strong>開発手法の変更:</strong> アジャイル開発への移行に伴い、各種仕様を見直し。</li>
+          <li><strong>UI・システムフローの刷新:</strong> 新しい画面構成（Settings / Home / Log）に基づき処理フローを4段階に再定義。画像も最新のモックアップ・フロー図へ差し替え。</li>
+          <li><strong>モデルの追加:</strong> 検証対象モデルとして新たに <code>qwen</code> を追加。</li>
+          <li><strong>テスト計画の再編:</strong> 従来の機能・異常系などの分類を廃止し、画面遷移・ユーザーストーリーに沿った6カテゴリに再編。「完全オフライン動作検証」をクリティカル要件として明記。</li>
+          <li><strong>録音仕様の変更:</strong> UIの設計に合わせ、「最大20秒での自動停止」または「手動停止」へ仕様変更。</li>
+          <li><strong>ログスキーマの最適化:</strong> <code>test_category</code>, <code>sample_rate_hz</code>, <code>ram_peak_mb</code> 等の不要項目を削除し、品質検証用の <code>is_cached</code> フラグを追加。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="history-row">
+      <span class="h-ver">v1.1.0</span>
+      <span class="h-date">2026-08-25</span>
+      <div class="h-desc">
+        <strong>【レビュー対応】</strong><br>
+        1週間の実装スコープに向け、不要なテスト項目や中断処理を削除。モデル起動時ロードへの変更、Inference Timeの重視、目次の追加などを反映。
+      </div>
+    </div>
+    <div class="history-row">
+      <span class="h-ver">v1.0.0</span>
+      <span class="h-date">2026-08-24</span>
+      <div class="h-desc">
+        <strong>【初版作成】</strong><br>
+        document-over.txt、Spiral1_STT_Test_Items_100.md、quantization_patent_research.md の3ドキュメントを統合し、設計書として体系化。
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+</body>
+</html>
